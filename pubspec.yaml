@@ -1,0 +1,34 @@
+name: credentials_store
+description: A secure credentials storage app.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  local_auth: ^2.1.8
+  flutter_secure_storage: ^9.0.0
+  shared_preferences: ^2.2.2
+  encrypt: ^5.0.1
+  flutter_slidable: ^3.0.1
+  uuid: ^4.2.1
+  image_picker: ^1.0.7
+  path_provider: ^2.1.2
+  path: ^1.8.3
+  url_launcher: ^6.2.4
+  share_plus: ^7.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/images/ 

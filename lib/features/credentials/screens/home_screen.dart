@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddEditItemScreen(),
+              builder: (context) => const AddEditCredentialScreen(),
             ),
           );
         },

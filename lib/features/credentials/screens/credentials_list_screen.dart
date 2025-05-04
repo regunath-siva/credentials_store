@@ -332,7 +332,7 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
                                   final result = await Navigator.push<bool>(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => AddEditItemScreen(
+                                      builder: (context) => AddEditCredentialScreen(
                                         credential: credential,
                                       ),
                                     ),
@@ -361,7 +361,7 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
           final result = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddEditItemScreen(),
+              builder: (context) => const AddEditCredentialScreen(),
             ),
           );
           if (result == true) {

@@ -364,7 +364,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen> with SingleTi
                                   final result = await Navigator.push<bool>(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => AddEditItemScreen(
+                                      builder: (context) => AddEditCredentialScreen(
                                         document: document,
                                       ),
                                     ),
@@ -393,7 +393,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen> with SingleTi
           final result = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddEditItemScreen(),
+              builder: (context) => const AddEditCredentialScreen(),
             ),
           );
           if (result == true) {

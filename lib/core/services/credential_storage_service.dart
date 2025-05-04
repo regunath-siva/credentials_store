@@ -309,4 +309,75 @@ class CredentialStorageService {
       value: json.encode(deletedDocuments.map((d) => d.toJson()).toList()),
     );
   }
+
+  Future<void> addDocument(Document document) async {
+    await init();
+    final documents = await getDocuments();
+    final newDocument = Document(
+      id: _uuid.v4(),
+      title: document.title,
+      documentNumber: document.documentNumber,
+      photoPath: document.photoPath,
+      notes: document.notes,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    documents.add(newDocument);
+    await _addToDocumentHistory(newDocument, 'created');
+    await _storage.write(
+      key: _documentsKey,
+      value: json.encode(documents.map((d) => d.toJson()).toList()),
+    );
+  }
+
+  Future<void> updateDocument(Document document) async {
+    await init();
+    final documents = await getDocuments();
+    final index = documents.indexWhere((d) => d.id == document.id);
+    if (index != -1) {
+      documents[index] = document.copyWith(updatedAt: DateTime.now());
+      await _addToDocumentHistory(documents[index], 'updated');
+      await _storage.write(
+        key: _documentsKey,
+        value: json.encode(documents.map((d) => d.toJson()).toList()),
+      );
+    }
+  }
+
+  Future<void> addCredential(Credential credential) async {
+    await init();
+    final credentials = await getCredentials();
+    final newCredential = Credential(
+      id: _uuid.v4(),
+      title: credential.title,
+      username: credential.username,
+      password: credential.password,
+      url: credential.url,
+      iconPath: credential.iconPath,
+      isDefaultIcon: credential.isDefaultIcon,
+      notes: credential.notes,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    credentials.add(newCredential);
+    await _addToHistory(newCredential, 'created');
+    await _storage.write(
+      key: _credentialsKey,
+      value: json.encode(credentials.map((c) => c.toJson()).toList()),
+    );
+  }
+
+  Future<void> updateCredential(Credential credential) async {
+    await init();
+    final credentials = await getCredentials();
+    final index = credentials.indexWhere((c) => c.id == credential.id);
+    if (index != -1) {
+      credentials[index] = credential.copyWith(updatedAt: DateTime.now());
+      await _addToHistory(credentials[index], 'updated');
+      await _storage.write(
+        key: _credentialsKey,
+        value: json.encode(credentials.map((c) => c.toJson()).toList()),
+      );
+    }
+  }
 } 

@@ -6,6 +6,8 @@ class Document {
   final String documentNumber;
   final String? photoPath;
   final String? notes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Document({
     this.id,
@@ -13,7 +15,11 @@ class Document {
     required this.documentNumber,
     this.photoPath,
     this.notes,
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) : 
+    createdAt = createdAt ?? DateTime.now(),
+    updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() {
     return {
@@ -22,16 +28,24 @@ class Document {
       'documentNumber': documentNumber,
       'photoPath': photoPath,
       'notes': notes,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   factory Document.fromJson(Map<String, dynamic> json) {
     return Document(
-      id: json['id'],
-      title: json['title'],
-      documentNumber: json['documentNumber'],
-      photoPath: json['photoPath'],
-      notes: json['notes'],
+      id: json['id'] as String?,
+      title: json['title'] as String? ?? '',
+      documentNumber: json['documentNumber'] as String? ?? '',
+      photoPath: json['photoPath'] as String?,
+      notes: json['notes'] as String?,
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : DateTime.now(),
     );
   }
 
@@ -40,6 +54,7 @@ class Document {
     String? documentNumber,
     String? photoPath,
     String? notes,
+    DateTime? updatedAt,
   }) {
     return Document(
       id: id,
@@ -47,6 +62,8 @@ class Document {
       documentNumber: documentNumber ?? this.documentNumber,
       photoPath: photoPath ?? this.photoPath,
       notes: notes ?? this.notes,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
     );
   }
 } 

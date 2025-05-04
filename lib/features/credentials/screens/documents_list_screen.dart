@@ -4,7 +4,8 @@ import '../../../core/services/credential_storage_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/document.dart';
 import '../widgets/document_card.dart';
-import 'add_edit_credential_screen.dart';
+import 'add_edit_item_screen.dart';
+import 'document_bin_screen.dart';
 import 'document_history_screen.dart';
 
 class DocumentsListScreen extends StatefulWidget {
@@ -198,31 +199,38 @@ class _DocumentsListScreenState extends State<DocumentsListScreen> with SingleTi
                               color: Color(0xFF1565c0),
                             ),
                           ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: IconButton(
-                              icon: Icon(
-                                _showDeleted ? Icons.restore : Icons.delete,
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.history),
                                 color: AppTheme.primaryColor,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const DocumentHistoryScreen(
+                                        documentId: '',
+                                        documentTitle: 'All Documents',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                tooltip: 'View History',
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _showDeleted = !_showDeleted;
-                                  _filteredDocuments = _showDeleted ? _deletedDocuments : _documents;
-                                });
-                              },
-                              tooltip: _showDeleted ? 'Show Documents' : 'Show Bin',
-                            ),
+                              IconButton(
+                                icon: const Icon(Icons.delete),
+                                color: AppTheme.primaryColor,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const DocumentBinScreen(),
+                                    ),
+                                  );
+                                },
+                                tooltip: 'View Bin',
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -319,83 +327,55 @@ class _DocumentsListScreenState extends State<DocumentsListScreen> with SingleTi
                             return const SizedBox.shrink();
                           }
                           final document = _filteredDocuments[index];
-                          return SizedBox(
-                            height: 90,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Slidable(
-                                key: ValueKey(document.id),
-                                endActionPane: ActionPane(
-                                  motion: const ScrollMotion(),
-                                  extentRatio: 0.5,
-                                  children: [
-                                    if (!_showDeleted) ...[
-                                      SlidableAction(
-                                        onPressed: (_) => _viewHistory(document),
-                                        backgroundColor: const Color(0xFF1976D2),
-                                        foregroundColor: Colors.white,
-                                        icon: Icons.history,
-                                        label: 'History',
-                                        borderRadius: BorderRadius.circular(16),
-                                        spacing: 8,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Slidable(
+                              key: ValueKey(document.id),
+                              endActionPane: ActionPane(
+                                motion: const ScrollMotion(),
+                                extentRatio: 0.5,
+                                children: [
+                                  SlidableAction(
+                                    onPressed: (_) => _viewHistory(document),
+                                    backgroundColor: const Color(0xFF1976D2),
+                                    foregroundColor: Colors.white,
+                                    icon: Icons.history,
+                                    label: 'History',
+                                    borderRadius: BorderRadius.circular(16),
+                                    spacing: 8,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SlidableAction(
+                                    onPressed: (_) => _moveToBin(document),
+                                    backgroundColor: const Color(0xFFFFA726),
+                                    foregroundColor: Colors.white,
+                                    icon: Icons.delete,
+                                    label: 'Bin',
+                                    borderRadius: BorderRadius.circular(16),
+                                    spacing: 8,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  ),
+                                ],
+                              ),
+                              child: DocumentCard(
+                                document: document,
+                                onTap: () async {
+                                  final result = await Navigator.push<bool>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AddEditItemScreen(
+                                        document: document,
                                       ),
-                                      const SizedBox(width: 8),
-                                      SlidableAction(
-                                        onPressed: (_) => _moveToBin(document),
-                                        backgroundColor: const Color(0xFFFFA726),
-                                        foregroundColor: Colors.white,
-                                        icon: Icons.delete,
-                                        label: 'Bin',
-                                        borderRadius: BorderRadius.circular(16),
-                                        spacing: 8,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                      ),
-                                    ],
-                                    if (_showDeleted) ...[
-                                      SlidableAction(
-                                        onPressed: (_) => _restoreFromBin(document),
-                                        backgroundColor: const Color(0xFF43A047),
-                                        foregroundColor: Colors.white,
-                                        icon: Icons.restore,
-                                        label: 'Restore',
-                                        borderRadius: BorderRadius.circular(16),
-                                        spacing: 8,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      SlidableAction(
-                                        onPressed: (_) => _permanentlyDelete(document),
-                                        backgroundColor: const Color(0xFFD32F2F),
-                                        foregroundColor: Colors.white,
-                                        icon: Icons.delete_forever,
-                                        label: 'Delete',
-                                        borderRadius: BorderRadius.circular(16),
-                                        spacing: 8,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                child: DocumentCard(
-                                  document: document,
-                                  onTap: () async {
-                                    if (!_showDeleted) {
-                                      final result = await Navigator.push<bool>(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => AddEditCredentialScreen(
-                                            document: document,
-                                          ),
-                                        ),
-                                      );
-                                      if (result == true) {
-                                        await _loadDocuments();
-                                        _filterDocuments('');
-                                      }
-                                    }
-                                  },
-                                ),
+                                    ),
+                                  );
+                                  if (result == true) {
+                                    await _loadDocuments();
+                                    _filterDocuments('');
+                                  }
+                                },
+                                onHistory: () => _viewHistory(document),
+                                onBin: () => _moveToBin(document),
                               ),
                             ),
                           );
@@ -407,7 +387,23 @@ class _DocumentsListScreenState extends State<DocumentsListScreen> with SingleTi
           ),
         ],
       ),
-      floatingActionButton: null,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'documents_fab',
+        onPressed: () async {
+          final result = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddEditItemScreen(),
+            ),
+          );
+          if (result == true) {
+            await _loadDocuments();
+            _filterDocuments('');
+          }
+        },
+        backgroundColor: AppTheme.primaryColor,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 

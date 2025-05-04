@@ -3,6 +3,7 @@ import '../../../core/services/credential_storage_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/credential_history.dart';
 import '../models/credential.dart';
+import '../widgets/screen_header.dart';
 
 class CredentialHistoryScreen extends StatefulWidget {
   final String credentialId;
@@ -22,6 +23,66 @@ class _CredentialHistoryScreenState extends State<CredentialHistoryScreen> {
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _itemKeys = {};
   bool _showAllDetails = false;
+  bool _isLoading = true;
+  List<CredentialHistory> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final storage = CredentialStorageService();
+      await storage.init();
+      
+      if (widget.credentialId.isEmpty) {
+        // Load all credentials history
+        final credentials = await storage.getCredentials();
+        final deletedCredentials = await storage.getDeletedCredentials();
+        final allCredentials = [...credentials, ...deletedCredentials];
+        
+        final allHistory = <CredentialHistory>[];
+        for (final cred in allCredentials) {
+          if (cred.id != null) {
+            final credHistory = await storage.getCredentialHistory(cred.id!);
+            allHistory.addAll(credHistory);
+          }
+        }
+        allHistory.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        
+        if (mounted) {
+          setState(() {
+            _history = allHistory;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Load specific credential history
+        final history = await storage.getCredentialHistory(widget.credentialId);
+        if (mounted) {
+          setState(() {
+            _history = history;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading history: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load history: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   void _toggleShowAllDetails() {
     setState(() {
@@ -39,60 +100,90 @@ class _CredentialHistoryScreenState extends State<CredentialHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: Text('History: ${widget.credentialTitle}'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(_showAllDetails ? Icons.list : Icons.view_agenda),
-            onPressed: _toggleShowAllDetails,
-            tooltip: _showAllDetails ? 'Show Summary' : 'Show All Details',
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFe3f2fd),
+                  Color(0xFFffffff),
+                ],
+              ),
+            ),
+          ),
+          CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: ScreenHeader(
+                  title: widget.credentialId.isEmpty 
+                      ? 'Credentials History'
+                      : 'History: ${widget.credentialTitle}',
+                  actions: [
+                    IconButton(
+                      icon: Icon(_showAllDetails ? Icons.list : Icons.view_agenda),
+                      color: AppTheme.primaryColor,
+                      onPressed: _toggleShowAllDetails,
+                      tooltip: _showAllDetails ? 'Show Summary' : 'Show All Details',
+                    ),
+                  ],
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                sliver: _isLoading
+                    ? const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : _history.isEmpty
+                        ? SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.history,
+                                    size: 64,
+                                    color: Colors.grey.withOpacity(0.5),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No history found',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.withOpacity(0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                if (index < 0 || index >= _history.length) {
+                                  return const SizedBox.shrink();
+                                }
+                                final item = _history[index];
+                                final previousItem = index > 0 ? _history[index - 1] : null;
+                                return _HistoryCard(
+                                  item: item,
+                                  previousItem: previousItem,
+                                  showAllDetails: _showAllDetails,
+                                );
+                              },
+                              childCount: _history.length,
+                            ),
+                          ),
+              ),
+            ],
           ),
         ],
-      ),
-      body: FutureBuilder<List<CredentialHistory>>(
-        future: CredentialStorageService().getCredentialHistory(widget.credentialId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error: ${snapshot.error}'),
-            );
-          }
-
-          final history = snapshot.data ?? [];
-
-          if (history.isEmpty) {
-            return const Center(
-              child: Text('No history available'),
-            );
-          }
-
-          return ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.all(16),
-            itemCount: history.length,
-            itemBuilder: (context, index) {
-              final item = history[index];
-              final previousItem = index < history.length - 1 ? history[index + 1] : null;
-              
-              if (!_itemKeys.containsKey(item.id)) {
-                _itemKeys[item.id] = GlobalKey();
-              }
-              
-              return _HistoryCard(
-                key: _itemKeys[item.id],
-                item: item,
-                previousItem: previousItem,
-                showAllDetails: _showAllDetails,
-              );
-            },
-          );
-        },
       ),
     );
   }
@@ -173,10 +264,8 @@ class _HistoryCard extends StatelessWidget {
               if (showAllDetails) ...[
                 _buildChangeItem('Title', item.credential.title),
                 _buildChangeItem('Username', item.credential.username),
-                _buildPasswordItem(item.credential.password),
-                if (item.credential.url != null) _buildChangeItem('URL', item.credential.url!),
                 if (item.credential.notes != null) _buildChangeItem('Notes', item.credential.notes!),
-                if (item.credential.iconPath != null) const Text('Icon: Added'),
+                if (item.credential.url != null) _buildChangeItem('URL', item.credential.url!),
               ] else ...[
                 _buildSummaryCreated(),
               ],
@@ -241,10 +330,8 @@ class _HistoryCard extends StatelessWidget {
     
     if (item.credential.title != previousItem!.credential.title) changes.add('Title');
     if (item.credential.username != previousItem!.credential.username) changes.add('Username');
-    if (item.credential.password != previousItem!.credential.password) changes.add('Password');
-    if (item.credential.url != previousItem!.credential.url) changes.add('URL');
     if (item.credential.notes != previousItem!.credential.notes) changes.add('Notes');
-    if (item.credential.iconPath != previousItem!.credential.iconPath) changes.add('Icon');
+    if (item.credential.url != previousItem!.credential.url) changes.add('URL');
 
     return Text(
       'Updated: ${changes.join(", ")}',
@@ -274,17 +361,11 @@ class _HistoryCard extends StatelessWidget {
     if (item.credential.username != previousItem!.credential.username) {
       changes.add(_buildChangeComparison('Username', previousItem!.credential.username, item.credential.username));
     }
-    if (item.credential.password != previousItem!.credential.password) {
-      changes.add(_buildPasswordComparison(previousItem!.credential.password, item.credential.password));
-    }
-    if (item.credential.url != previousItem!.credential.url) {
-      changes.add(_buildChangeComparison('URL', previousItem!.credential.url ?? 'Not set', item.credential.url ?? 'Not set'));
-    }
     if (item.credential.notes != previousItem!.credential.notes) {
       changes.add(_buildChangeComparison('Notes', previousItem!.credential.notes ?? 'Not set', item.credential.notes ?? 'Not set'));
     }
-    if (item.credential.iconPath != previousItem!.credential.iconPath) {
-      changes.add(_buildChangeComparison('Icon', previousItem!.credential.iconPath ?? 'Not set', item.credential.iconPath ?? 'Not set'));
+    if (item.credential.url != previousItem!.credential.url) {
+      changes.add(_buildChangeComparison('URL', previousItem!.credential.url ?? 'Not set', item.credential.url ?? 'Not set'));
     }
 
     return Column(
@@ -296,121 +377,22 @@ class _HistoryCard extends StatelessWidget {
   Widget _buildChangeItem(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPasswordItem(String password) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(
-            width: 80,
-            child: Text(
-              'Password:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              password,
-              style: const TextStyle(
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPasswordComparison(String oldPassword, String newPassword) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Password',
-            style: TextStyle(
+          Text(
+            label,
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              fontSize: 14,
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Old:',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      oldPassword,
-                      style: const TextStyle(
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'New:',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      newPassword,
-                      style: const TextStyle(
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -419,7 +401,7 @@ class _HistoryCard extends StatelessWidget {
 
   Widget _buildChangeComparison(String label, String oldValue, String newValue) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -427,53 +409,36 @@ class _HistoryCard extends StatelessWidget {
             label,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              fontSize: 14,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Row(
             children: [
+              const Icon(Icons.arrow_back, size: 16, color: Colors.red),
+              const SizedBox(width: 4),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Old:',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      oldValue,
-                      style: const TextStyle(
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  oldValue,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.red,
+                  ),
                 ),
               ),
-              const SizedBox(width: 16),
+            ],
+          ),
+          Row(
+            children: [
+              const Icon(Icons.arrow_forward, size: 16, color: Colors.green),
+              const SizedBox(width: 4),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'New:',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      newValue,
-                      style: const TextStyle(
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  newValue,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.green,
+                  ),
                 ),
               ),
             ],

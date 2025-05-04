@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import 'credentials_list_screen.dart';
 import 'documents_list_screen.dart';
-import 'add_edit_credential_screen.dart';
+import 'add_edit_item_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -67,11 +67,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'home_fab',
         onPressed: () {
           Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddEditCredentialScreen(),
+              builder: (context) => const AddEditItemScreen(),
             ),
           );
         },

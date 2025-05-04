@@ -4,8 +4,9 @@ import '../../../core/services/credential_storage_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/credential.dart';
 import '../widgets/credential_card.dart';
-import 'add_edit_credential_screen.dart';
+import 'add_edit_item_screen.dart';
 import 'credential_history_screen.dart';
+import 'credential_bin_screen.dart';
 
 class CredentialsListScreen extends StatefulWidget {
   const CredentialsListScreen({Key? key}) : super(key: key);
@@ -19,8 +20,6 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
   final CredentialStorageService _storageService = CredentialStorageService();
   List<Credential> _credentials = [];
   List<Credential> _filteredCredentials = [];
-  List<Credential> _deletedCredentials = [];
-  bool _showDeleted = false;
   late AnimationController _animationController;
 
   @override
@@ -37,12 +36,10 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
     try {
       await _storageService.init();
       final credentials = await _storageService.getCredentials();
-      final deleted = await _storageService.getDeletedCredentials();
       if (mounted) {
         setState(() {
           _credentials = credentials;
-          _deletedCredentials = deleted;
-          _filteredCredentials = _showDeleted ? _deletedCredentials : _credentials;
+          _filteredCredentials = _credentials;
         });
       }
     } catch (e) {
@@ -60,15 +57,14 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
 
   void _filterCredentials(String query) {
     setState(() {
-      _filteredCredentials = (_showDeleted ? _deletedCredentials : _credentials)
-          .where((credential) {
+      _filteredCredentials = _credentials.where((credential) {
         final title = credential.title.toLowerCase();
         final username = credential.username.toLowerCase();
-        final url = credential.url?.toLowerCase() ?? '';
+        final notes = credential.notes?.toLowerCase() ?? '';
         final searchQuery = query.toLowerCase();
         return title.contains(searchQuery) ||
             username.contains(searchQuery) ||
-            url.contains(searchQuery);
+            notes.contains(searchQuery);
       }).toList();
     });
   }
@@ -113,40 +109,6 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
     }
   }
 
-  Future<void> _restoreFromBin(Credential credential) async {
-    if (credential.id == null) return;
-
-    await _storageService.restoreFromBin(credential.id!);
-    _loadCredentials();
-  }
-
-  Future<void> _permanentlyDelete(Credential credential) async {
-    if (credential.id == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Permanently Delete'),
-        content: Text('Are you sure you want to permanently delete ${credential.title}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await _storageService.permanentlyDelete(credential.id!);
-      _loadCredentials();
-    }
-  }
-
   Future<void> _viewHistory(Credential credential) async {
     if (credential.id == null) return;
 
@@ -157,6 +119,15 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
           credentialId: credential.id!,
           credentialTitle: credential.title,
         ),
+      ),
+    );
+  }
+
+  void _viewBin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CredentialBinScreen(),
       ),
     );
   }
@@ -198,31 +169,38 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
                               color: Color(0xFF1565c0),
                             ),
                           ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: IconButton(
-                              icon: Icon(
-                                _showDeleted ? Icons.restore : Icons.delete,
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.history),
                                 color: AppTheme.primaryColor,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const CredentialHistoryScreen(
+                                        credentialId: '',
+                                        credentialTitle: 'All Credentials',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                tooltip: 'View History',
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _showDeleted = !_showDeleted;
-                                  _filteredCredentials = _showDeleted ? _deletedCredentials : _credentials;
-                                });
-                              },
-                              tooltip: _showDeleted ? 'Show Credentials' : 'Show Bin',
-                            ),
+                              IconButton(
+                                icon: const Icon(Icons.delete),
+                                color: AppTheme.primaryColor,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const CredentialBinScreen(),
+                                    ),
+                                  );
+                                },
+                                tooltip: 'View Bin',
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -291,23 +269,21 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _showDeleted ? 'Bin is empty' : 'No credentials found',
+                              'No credentials found',
                               style: TextStyle(
                                 fontSize: 18,
                                 color: Colors.grey.withOpacity(0.7),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            if (!_showDeleted) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tap + to add a new credential',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.withOpacity(0.5),
-                                ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tap + to add a new credential',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.withOpacity(0.5),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),
@@ -327,78 +303,47 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
                                 motion: const ScrollMotion(),
                                 extentRatio: 0.5,
                                 children: [
-                                  if (!_showDeleted) ...[
-                                    SlidableAction(
-                                      onPressed: (_) => _viewHistory(credential),
-                                      backgroundColor: const Color(0xFF1976D2),
-                                      foregroundColor: Colors.white,
-                                      icon: Icons.history,
-                                      label: 'History',
-                                      borderRadius: BorderRadius.circular(16),
-                                      spacing: 8,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    SlidableAction(
-                                      onPressed: (_) => _moveToBin(credential),
-                                      backgroundColor: const Color(0xFFFFA726),
-                                      foregroundColor: Colors.white,
-                                      icon: Icons.delete,
-                                      label: 'Bin',
-                                      borderRadius: BorderRadius.circular(16),
-                                      spacing: 8,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                    ),
-                                  ],
-                                  if (_showDeleted) ...[
-                                    SlidableAction(
-                                      onPressed: (_) => _restoreFromBin(credential),
-                                      backgroundColor: const Color(0xFF43A047),
-                                      foregroundColor: Colors.white,
-                                      icon: Icons.restore,
-                                      label: 'Restore',
-                                      borderRadius: BorderRadius.circular(16),
-                                      spacing: 8,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    SlidableAction(
-                                      onPressed: (_) => _permanentlyDelete(credential),
-                                      backgroundColor: const Color(0xFFD32F2F),
-                                      foregroundColor: Colors.white,
-                                      icon: Icons.delete_forever,
-                                      label: 'Delete',
-                                      borderRadius: BorderRadius.circular(16),
-                                      spacing: 8,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                    ),
-                                  ],
+                                  SlidableAction(
+                                    onPressed: (_) => _viewHistory(credential),
+                                    backgroundColor: const Color(0xFF1976D2),
+                                    foregroundColor: Colors.white,
+                                    icon: Icons.history,
+                                    label: 'History',
+                                    borderRadius: BorderRadius.circular(16),
+                                    spacing: 8,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SlidableAction(
+                                    onPressed: (_) => _moveToBin(credential),
+                                    backgroundColor: const Color(0xFFFFA726),
+                                    foregroundColor: Colors.white,
+                                    icon: Icons.delete,
+                                    label: 'Bin',
+                                    borderRadius: BorderRadius.circular(16),
+                                    spacing: 8,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  ),
                                 ],
                               ),
                               child: CredentialCard(
                                 credential: credential,
-                                showDeleted: _showDeleted,
                                 onTap: () async {
-                                  if (!_showDeleted) {
-                                    final result = await Navigator.push<bool>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AddEditCredentialScreen(
-                                          credential: credential,
-                                        ),
+                                  final result = await Navigator.push<bool>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AddEditItemScreen(
+                                        credential: credential,
                                       ),
-                                    );
-                                    if (result == true) {
-                                      await _loadCredentials();
-                                      _filterCredentials('');
-                                    }
+                                    ),
+                                  );
+                                  if (result == true) {
+                                    await _loadCredentials();
+                                    _filterCredentials('');
                                   }
                                 },
                                 onHistory: () => _viewHistory(credential),
                                 onBin: () => _moveToBin(credential),
-                                onRestore: () => _restoreFromBin(credential),
-                                onDelete: () => _permanentlyDelete(credential),
-                                indicatorColor: AppTheme.primaryColor,
                               ),
                             ),
                           );
@@ -410,7 +355,23 @@ class _CredentialsListScreenState extends State<CredentialsListScreen> with Sing
           ),
         ],
       ),
-      floatingActionButton: null,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'credentials_fab',
+        onPressed: () async {
+          final result = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddEditItemScreen(),
+            ),
+          );
+          if (result == true) {
+            await _loadCredentials();
+            _filterCredentials('');
+          }
+        },
+        backgroundColor: AppTheme.primaryColor,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 

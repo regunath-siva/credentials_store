@@ -3,6 +3,7 @@ import '../../../core/services/credential_storage_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/document_history.dart';
 import '../models/document.dart';
+import '../widgets/screen_header.dart';
 
 class DocumentHistoryScreen extends StatefulWidget {
   final String documentId;
@@ -22,6 +23,66 @@ class _DocumentHistoryScreenState extends State<DocumentHistoryScreen> {
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _itemKeys = {};
   bool _showAllDetails = false;
+  bool _isLoading = true;
+  List<DocumentHistory> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final storage = CredentialStorageService();
+      await storage.init();
+      
+      if (widget.documentId.isEmpty) {
+        // Load all documents history
+        final documents = await storage.getDocuments();
+        final deletedDocuments = await storage.getDeletedDocuments();
+        final allDocuments = [...documents, ...deletedDocuments];
+        
+        final allHistory = <DocumentHistory>[];
+        for (final doc in allDocuments) {
+          if (doc.id != null) {
+            final docHistory = await storage.getDocumentHistory(doc.id!);
+            allHistory.addAll(docHistory);
+          }
+        }
+        allHistory.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        
+        if (mounted) {
+          setState(() {
+            _history = allHistory;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Load specific document history
+        final history = await storage.getDocumentHistory(widget.documentId);
+        if (mounted) {
+          setState(() {
+            _history = history;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading history: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load history: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   void _toggleShowAllDetails() {
     setState(() {
@@ -39,60 +100,90 @@ class _DocumentHistoryScreenState extends State<DocumentHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: Text('History: ${widget.documentTitle}'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(_showAllDetails ? Icons.list : Icons.view_agenda),
-            onPressed: _toggleShowAllDetails,
-            tooltip: _showAllDetails ? 'Show Summary' : 'Show All Details',
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFe3f2fd),
+                  Color(0xFFffffff),
+                ],
+              ),
+            ),
+          ),
+          CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: ScreenHeader(
+                  title: widget.documentId.isEmpty 
+                      ? 'Documents History'
+                      : 'History: ${widget.documentTitle}',
+                  actions: [
+                    IconButton(
+                      icon: Icon(_showAllDetails ? Icons.list : Icons.view_agenda),
+                      color: AppTheme.primaryColor,
+                      onPressed: _toggleShowAllDetails,
+                      tooltip: _showAllDetails ? 'Show Summary' : 'Show All Details',
+                    ),
+                  ],
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                sliver: _isLoading
+                    ? const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : _history.isEmpty
+                        ? SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.history,
+                                    size: 64,
+                                    color: Colors.grey.withOpacity(0.5),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No history found',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.withOpacity(0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                if (index < 0 || index >= _history.length) {
+                                  return const SizedBox.shrink();
+                                }
+                                final item = _history[index];
+                                final previousItem = index > 0 ? _history[index - 1] : null;
+                                return _HistoryCard(
+                                  item: item,
+                                  previousItem: previousItem,
+                                  showAllDetails: _showAllDetails,
+                                );
+                              },
+                              childCount: _history.length,
+                            ),
+                          ),
+              ),
+            ],
           ),
         ],
-      ),
-      body: FutureBuilder<List<DocumentHistory>>(
-        future: CredentialStorageService().getDocumentHistory(widget.documentId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error: ${snapshot.error}'),
-            );
-          }
-
-          final history = snapshot.data ?? [];
-
-          if (history.isEmpty) {
-            return const Center(
-              child: Text('No history available'),
-            );
-          }
-
-          return ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.all(16),
-            itemCount: history.length,
-            itemBuilder: (context, index) {
-              final item = history[index];
-              final previousItem = index < history.length - 1 ? history[index + 1] : null;
-              
-              if (!_itemKeys.containsKey(item.id)) {
-                _itemKeys[item.id] = GlobalKey();
-              }
-              
-              return _HistoryCard(
-                key: _itemKeys[item.id],
-                item: item,
-                previousItem: previousItem,
-                showAllDetails: _showAllDetails,
-              );
-            },
-          );
-        },
       ),
     );
   }

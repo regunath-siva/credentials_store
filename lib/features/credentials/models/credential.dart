@@ -9,6 +9,8 @@ class Credential {
   final String? iconPath;
   final bool isDefaultIcon;
   final String? notes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Credential({
     this.id,
@@ -19,7 +21,11 @@ class Credential {
     this.iconPath,
     this.isDefaultIcon = true,
     this.notes,
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) : 
+    createdAt = createdAt ?? DateTime.now(),
+    updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() {
     return {
@@ -31,19 +37,27 @@ class Credential {
       'iconPath': iconPath,
       'isDefaultIcon': isDefaultIcon,
       'notes': notes,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   factory Credential.fromJson(Map<String, dynamic> json) {
     return Credential(
-      id: json['id'],
-      title: json['title'],
-      username: json['username'],
-      password: json['password'],
-      url: json['url'],
-      iconPath: json['iconPath'],
-      isDefaultIcon: json['isDefaultIcon'] ?? true,
-      notes: json['notes'],
+      id: json['id'] as String?,
+      title: json['title'] as String? ?? '',
+      username: json['username'] as String? ?? '',
+      password: json['password'] as String? ?? '',
+      url: json['url'] as String?,
+      iconPath: json['iconPath'] as String?,
+      isDefaultIcon: json['isDefaultIcon'] as bool? ?? true,
+      notes: json['notes'] as String?,
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : DateTime.now(),
     );
   }
 
@@ -55,6 +69,7 @@ class Credential {
     String? iconPath,
     bool? isDefaultIcon,
     String? notes,
+    DateTime? updatedAt,
   }) {
     return Credential(
       id: id,
@@ -65,6 +80,8 @@ class Credential {
       iconPath: iconPath ?? this.iconPath,
       isDefaultIcon: isDefaultIcon ?? this.isDefaultIcon,
       notes: notes ?? this.notes,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
     );
   }
 } 

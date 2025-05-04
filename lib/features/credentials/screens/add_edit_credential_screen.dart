@@ -174,8 +174,8 @@ class _AddEditCredentialScreenState extends State<AddEditCredentialScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.credential == null && widget.document == null 
-            ? 'Add ${_selectedType == ItemType.credential ? "Credential" : "Document"}' 
-            : 'Edit ${_selectedType == ItemType.credential ? "Credential" : "Document"}'),
+            ? 'Add Item' 
+            : 'Edit Item'),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         actions: [

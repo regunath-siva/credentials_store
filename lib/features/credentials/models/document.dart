@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
+import 'sortable_item.dart';
 
-class Document {
+class Document implements SortableItem {
   final String? id;
   final String title;
   final String documentNumber;

@@ -387,23 +387,7 @@ class _DocumentsListScreenState extends State<DocumentsListScreen> with SingleTi
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'documents_fab',
-        onPressed: () async {
-          final result = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AddEditCredentialScreen(),
-            ),
-          );
-          if (result == true) {
-            await _loadDocuments();
-            _filterDocuments('');
-          }
-        },
-        backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.add),
-      ),
+
     );
   }
 

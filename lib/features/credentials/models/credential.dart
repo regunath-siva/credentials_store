@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
+import 'sortable_item.dart';
 
-class Credential {
+class Credential implements SortableItem {
   final String? id;
   final String title;
   final String username;

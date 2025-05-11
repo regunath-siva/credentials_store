@@ -1,0 +1,2 @@
+/Users/user/Desktop/Projects/Siva/credentials_store/android/app/.cxx/RelWithDebInfo/354h1b6w/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/user/Desktop/Projects/Siva/credentials_store/android/app/.cxx/RelWithDebInfo/354h1b6w/armeabi-v7a/CMakeFiles/rebuild_cache.dir

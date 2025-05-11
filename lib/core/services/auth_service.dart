@@ -56,8 +56,12 @@ class AuthService {
   }
 
   Future<bool> hasPin() async {
-    bool pinset =  await _secureStorage.containsKey(key: _pinKey);
-    return pinset;
+    bool pinSet =  await _secureStorage.containsKey(key: _pinKey);
+    if(pinSet) {
+      final storedPin = await _secureStorage.read(key: _pinKey);
+      pinSet = storedPin != null;
+    }
+    return pinSet;
   }
 
   Future<bool> shouldSetupPin() async {

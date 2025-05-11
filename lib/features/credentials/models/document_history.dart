@@ -7,6 +7,8 @@ class DocumentHistory {
   final Document document;
   final DateTime timestamp;
   final String action;
+  final String? oldDocumentNumber;
+  final String? oldNotes;
 
   DocumentHistory({
     required this.id,
@@ -14,6 +16,8 @@ class DocumentHistory {
     required this.document,
     required this.timestamp,
     required this.action,
+    this.oldDocumentNumber,
+    this.oldNotes,
   });
 
   Map<String, dynamic> toJson() {
@@ -23,6 +27,8 @@ class DocumentHistory {
       'document': document.toJson(),
       'timestamp': timestamp.toIso8601String(),
       'action': action,
+      'oldDocumentNumber': oldDocumentNumber,
+      'oldNotes': oldNotes,
     };
   }
 
@@ -33,6 +39,8 @@ class DocumentHistory {
       document: Document.fromJson(json['document']),
       timestamp: DateTime.parse(json['timestamp']),
       action: json['action'],
+      oldDocumentNumber: json['oldDocumentNumber'],
+      oldNotes: json['oldNotes'],
     );
   }
 } 

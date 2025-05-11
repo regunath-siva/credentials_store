@@ -7,7 +7,7 @@ import '../models/credential.dart';
 import '../models/document.dart';
 import '../../../core/services/credential_storage_service.dart';
 import 'dart:io';
-import 'credential_history_screen.dart';
+import 'secure_history_screen.dart';
 
 enum ItemType { credential, document }
 
@@ -161,9 +161,9 @@ class _AddEditCredentialScreenState extends State<AddEditCredentialScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CredentialHistoryScreen(
-          credentialId: widget.credential!.id!,
-          credentialTitle: widget.credential!.title,
+        builder: (context) => UnifiedHistoryScreen(
+          itemId: widget.credential!.id!,
+          itemTitle: widget.credential!.title,
         ),
       ),
     );
@@ -171,243 +171,493 @@ class _AddEditCredentialScreenState extends State<AddEditCredentialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.credential == null && widget.document == null
-            ? 'Add Item'
-            : 'Edit Item'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          if (widget.credential != null)
-            IconButton(
-              icon: const Icon(Icons.history),
-              onPressed: _viewHistory,
-              tooltip: 'View History',
-            ),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    return WillPopScope(
+      onWillPop: () async {
+        // Check if there are unsaved changes
+        if (_titleController.text.isNotEmpty ||
+            _usernameController.text.isNotEmpty ||
+            _passwordController.text.isNotEmpty ||
+            _urlController.text.isNotEmpty ||
+            _notesController.text.isNotEmpty ||
+            _documentNumberController.text.isNotEmpty ||
+            _selectedImage != null) {
+          final shouldPop = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Discard Changes?'),
+              content: const Text('You have unsaved changes. Are you sure you want to discard them?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
                 ),
-              ),
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.credential == null && widget.document == null)
-                SegmentedButton<ItemType>(
-                  segments: const [
-                    ButtonSegment<ItemType>(
-                      value: ItemType.credential,
-                      label: Text('Credential'),
-                      icon: Icon(Icons.lock),
-                    ),
-                    ButtonSegment<ItemType>(
-                      value: ItemType.document,
-                      label: Text('Document'),
-                      icon: Icon(Icons.description),
-                    ),
-                  ],
-                  selected: {_selectedType},
-                  onSelectionChanged: (Set<ItemType> selected) {
-                    setState(() {
-                      _selectedType = selected.first;
-                    });
-                  },
-                ),
-              const SizedBox(height: 24),
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: _selectedImage != null
-                      ? Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                        ),
-                      ),
-                      if (_selectedType == ItemType.document)
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: _shareImage,
-                          ),
-                        ),
-                    ],
-                  )
-                      : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _selectedType == ItemType.credential
-                            ? Icons.add_photo_alternate
-                            : Icons.add_a_photo,
-                        size: 40,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _selectedType == ItemType.credential
-                            ? 'Add Icon'
-                            : 'Add Photo',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.title),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a title';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              if (_selectedType == ItemType.credential) ...[
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a username';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                    ),
-                  ),
-                  obscureText: !_isPasswordVisible,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _urlController,
-                  decoration: InputDecoration(
-                    labelText: 'URL (optional)',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.link),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.open_in_new),
-                      onPressed: _launchUrl,
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                      try {
-                        Uri.parse(value);
-                      } catch (e) {
-                        return 'Please enter a valid URL';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-              ] else ...[
-                TextFormField(
-                  controller: _documentNumberController,
-                  decoration: const InputDecoration(
-                    labelText: 'Document Number',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.numbers),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a document number';
-                    }
-                    return null;
-                  },
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Discard'),
                 ),
               ],
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.note),
-                ),
-                maxLines: 3,
+            ),
+          );
+          if (shouldPop == true) {
+            Navigator.of(context).pop();
+          }
+          return false;
+        }
+        Navigator.of(context).pop();
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.credential == null && widget.document == null
+                ? _selectedType == ItemType.credential
+                    ? 'Add Credential'
+                    : 'Add Document'
+                : widget.credential != null
+                    ? 'Edit Credential'
+                    : 'Edit Document',
+          ),
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              // Check if there are unsaved changes
+              if (_titleController.text.isNotEmpty ||
+                  _usernameController.text.isNotEmpty ||
+                  _passwordController.text.isNotEmpty ||
+                  _urlController.text.isNotEmpty ||
+                  _notesController.text.isNotEmpty ||
+                  _documentNumberController.text.isNotEmpty ||
+                  _selectedImage != null) {
+                final shouldPop = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Discard Changes?'),
+                    content: const Text('You have unsaved changes. Are you sure you want to discard them?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Discard'),
+                      ),
+                    ],
+                  ),
+                );
+                if (shouldPop == true) {
+                  Navigator.of(context).pop();
+                }
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+          actions: [
+            if (widget.credential != null)
+              IconButton(
+                icon: const Icon(Icons.history),
+                onPressed: _viewHistory,
+                tooltip: 'View History',
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveItem,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 ),
-                child: Text(
-                  _isLoading ? 'Saving...' : 'Save',
-                  style: const TextStyle(fontSize: 16),
+              ),
+          ],
+        ),
+        body: SafeArea(
+          child: AppTheme.gradientContainer(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.all(4),
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(32),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          AnimatedAlign(
+                            alignment: _selectedType == ItemType.credential
+                                ? Alignment.centerLeft
+                                : Alignment.centerRight,
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeInOut,
+                            child: FractionallySizedBox(
+                              widthFactor: 0.5,
+                              heightFactor: 1.0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor,
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(28),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedType = ItemType.credential;
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.lock,
+                                          color: _selectedType == ItemType.credential
+                                              ? Colors.white
+                                              : AppTheme.primaryColor,
+                                          size: 22,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Credential',
+                                          style: TextStyle(
+                                            color: _selectedType == ItemType.credential
+                                                ? Colors.white
+                                                : AppTheme.primaryColor,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(28),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedType = ItemType.document;
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.description,
+                                          color: _selectedType == ItemType.document
+                                              ? Colors.white
+                                              : AppTheme.primaryColor,
+                                          size: 22,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Document',
+                                          style: TextStyle(
+                                            color: _selectedType == ItemType.document
+                                                ? Colors.white
+                                                : AppTheme.primaryColor,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (_selectedType == ItemType.document)
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: _selectedImage != null
+                              ? Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.file(
+                                        _selectedImage!,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 8,
+                                      top: 8,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.share, color: Colors.white),
+                                        onPressed: _shareImage,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_a_photo,
+                                      size: 40,
+                                      color: Colors.grey[600],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Add Photo',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: InputDecoration(
+                        labelText: 'Title',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppTheme.primaryColor),
+                        ),
+                        prefixIcon: const Icon(Icons.title),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a title';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    if (_selectedType == ItemType.credential) ...[
+                      TextFormField(
+                        controller: _usernameController,
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryColor),
+                          ),
+                          prefixIcon: const Icon(Icons.person),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a username';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryColor),
+                          ),
+                          prefixIcon: const Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isPasswordVisible = !_isPasswordVisible;
+                              });
+                            },
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        obscureText: !_isPasswordVisible,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a password';
+                          }
+                          if (value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _urlController,
+                        decoration: InputDecoration(
+                          labelText: 'URL (optional)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryColor),
+                          ),
+                          prefixIcon: const Icon(Icons.link),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.open_in_new),
+                            onPressed: _launchUrl,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        validator: (value) {
+                          if (value != null && value.isNotEmpty) {
+                            try {
+                              Uri.parse(value);
+                            } catch (e) {
+                              return 'Please enter a valid URL';
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+                    ] else ...[
+                      TextFormField(
+                        controller: _documentNumberController,
+                        decoration: InputDecoration(
+                          labelText: 'Document Number',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primaryColor),
+                          ),
+                          prefixIcon: const Icon(Icons.numbers),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a document number';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _notesController,
+                      decoration: InputDecoration(
+                        labelText: 'Notes (optional)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppTheme.primaryColor),
+                        ),
+                        prefixIcon: const Icon(Icons.note),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _saveItem,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: Text(
+                        _isLoading ? 'Saving...' : 'Save',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

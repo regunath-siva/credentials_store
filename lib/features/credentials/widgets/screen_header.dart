@@ -15,10 +15,23 @@ class ScreenHeader extends StatelessWidget {
     this.onBackPressed,
   }) : super(key: key);
 
+  void _handleBackPress(BuildContext context) {
+    if (onBackPressed != null) {
+      onBackPressed!();
+    } else {
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      } else {
+        // If we can't pop, try to navigate to the root
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 36, 24, 0),
+      padding: const EdgeInsets.only(right: 16,top: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -29,9 +42,9 @@ class ScreenHeader extends StatelessWidget {
                 children: [
                   if (showBackButton) ...[
                     IconButton(
-                      icon: const Icon(Icons.arrow_back),
+                      icon: const Icon(Icons.arrow_back, size: 30),
                       color: AppTheme.primaryColor,
-                      onPressed: onBackPressed ?? () => Navigator.pop(context),
+                      onPressed: () => _handleBackPress(context),
                       tooltip: 'Back',
                     ),
                     const SizedBox(width: 8),

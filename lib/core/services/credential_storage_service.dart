@@ -78,7 +78,7 @@ class CredentialStorageService {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
-  Future<void> _addToHistory(Credential credential, String action) async {
+  Future<void> _addToHistory(Credential credential, String action, {Credential? oldCredential}) async {
     await init();
     final historyJson = await _storage.read(key: _historyKey);
     List<dynamic> historyList = [];
@@ -93,6 +93,10 @@ class CredentialStorageService {
       credential: credential,
       timestamp: DateTime.now(),
       action: action,
+      oldUsername: oldCredential?.username,
+      oldPassword: oldCredential?.password,
+      oldUrl: oldCredential?.url,
+      oldNotes: oldCredential?.notes,
     );
 
     historyList.add(history.toJson());
@@ -109,8 +113,9 @@ class CredentialStorageService {
     final index = credentials.indexWhere((c) => c.id == credential.id);
     
     if (index != -1) {
+      final oldCredential = credentials[index];
       credentials[index] = credential;
-      await _addToHistory(credential, 'updated');
+      await _addToHistory(credential, 'updated', oldCredential: oldCredential);
     } else {
       credentials.add(credential);
       await _addToHistory(credential, 'created');
@@ -214,7 +219,7 @@ class CredentialStorageService {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
-  Future<void> _addToDocumentHistory(Document document, String action) async {
+  Future<void> _addToDocumentHistory(Document document, String action, {Document? oldDocument}) async {
     await init();
     final historyJson = await _storage.read(key: _documentHistoryKey);
     List<dynamic> historyList = [];
@@ -229,6 +234,8 @@ class CredentialStorageService {
       document: document,
       timestamp: DateTime.now(),
       action: action,
+      oldDocumentNumber: oldDocument?.documentNumber,
+      oldNotes: oldDocument?.notes,
     );
 
     historyList.add(history.toJson());
@@ -245,8 +252,9 @@ class CredentialStorageService {
     final index = documents.indexWhere((d) => d.id == document.id);
     
     if (index != -1) {
+      final oldDocument = documents[index];
       documents[index] = document;
-      await _addToDocumentHistory(document, 'updated');
+      await _addToDocumentHistory(document, 'updated', oldDocument: oldDocument);
     } else {
       documents.add(document);
       await _addToDocumentHistory(document, 'created');
@@ -379,5 +387,29 @@ class CredentialStorageService {
         value: json.encode(credentials.map((c) => c.toJson()).toList()),
       );
     }
+  }
+
+  Future<List<CredentialHistory>> getAllCredentialHistory() async {
+    await init();
+    final historyJson = await _storage.read(key: _historyKey);
+    if (historyJson == null) return [];
+    
+    final List<dynamic> historyList = json.decode(historyJson);
+    return historyList
+        .map((json) => CredentialHistory.fromJson(json))
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  Future<List<DocumentHistory>> getAllDocumentHistory() async {
+    await init();
+    final historyJson = await _storage.read(key: _documentHistoryKey);
+    if (historyJson == null) return [];
+    
+    final List<dynamic> historyList = json.decode(historyJson);
+    return historyList
+        .map((json) => DocumentHistory.fromJson(json))
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 } 

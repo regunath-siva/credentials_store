@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'core/widgets/auth_wrapper.dart';
+import 'features/auth/screens/auth_screen.dart';
 import 'features/credentials/screens/home_screen.dart';
 
 void main() {
@@ -17,9 +17,33 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: const AuthWrapper(
-        child: HomeScreen(),
-      ),
+      home: const AuthGate(),
     );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({Key? key}) : super(key: key);
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _authenticated = false;
+
+  void _onAuthenticated() {
+    setState(() {
+      _authenticated = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_authenticated) {
+      return AuthScreen(onAuthenticated: _onAuthenticated);
+    } else {
+      return const HomeScreen();
+    }
   }
 } 

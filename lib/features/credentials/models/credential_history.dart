@@ -6,6 +6,10 @@ class CredentialHistory {
   final Credential credential;
   final DateTime timestamp;
   final String action; // 'created', 'updated', 'deleted', 'restored'
+  final String? oldUsername;
+  final String? oldPassword;
+  final String? oldUrl;
+  final String? oldNotes;
 
   CredentialHistory({
     required this.id,
@@ -13,6 +17,10 @@ class CredentialHistory {
     required this.credential,
     required this.timestamp,
     required this.action,
+    this.oldUsername,
+    this.oldPassword,
+    this.oldUrl,
+    this.oldNotes,
   });
 
   Map<String, dynamic> toJson() {
@@ -22,6 +30,10 @@ class CredentialHistory {
       'credential': credential.toJson(),
       'timestamp': timestamp.toIso8601String(),
       'action': action,
+      'oldUsername': oldUsername,
+      'oldPassword': oldPassword,
+      'oldUrl': oldUrl,
+      'oldNotes': oldNotes,
     };
   }
 
@@ -32,6 +44,10 @@ class CredentialHistory {
       credential: Credential.fromJson(json['credential']),
       timestamp: DateTime.parse(json['timestamp']),
       action: json['action'],
+      oldUsername: json['oldUsername'],
+      oldPassword: json['oldPassword'],
+      oldUrl: json['oldUrl'],
+      oldNotes: json['oldNotes'],
     );
   }
 } 
